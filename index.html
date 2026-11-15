@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VSM builder and game</title>
+<style>
+:root{
+  --bg:#F2F5F7; --panel:#FFFFFF; --ink:#14212B; --ink2:#51606C; --line:#D5DCE2;
+  --work:#0F766E; --wait:#AEB9C3; --signal:#C2410C; --signal-bg:#FDEDE4;
+  --good:#166534; --good-bg:#E3F4E8; --accent:#1D4ED8; --accent-bg:#E6EDFD;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0F1519; --panel:#182027; --ink:#E8EEF2; --ink2:#9AA9B5; --line:#2C3842;
+    --work:#2DD4BF; --wait:#4A5864; --signal:#FB923C; --signal-bg:#3A2112;
+    --good:#86EFAC; --good-bg:#15301F; --accent:#93B4FF; --accent-bg:#1B2B4D;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:960px;margin:0 auto;padding:28px 20px 64px}
+h1{font-size:28px;line-height:1.2;margin:0 0 6px;font-weight:600;letter-spacing:-0.01em}
+h2{font-size:20px;margin:0 0 4px;font-weight:600}
+.lede,.hint{color:var(--ink2);margin:0 0 14px;max-width:70ch;font-size:15px}
+.hint{font-size:13px;margin:6px 0 0}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:20px 0}
+.how{margin:0;padding-left:20px;color:var(--ink2);font-size:15px}
+.how li{margin:2px 0}
+.bar-actions{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 0}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0}
+.metric{background:var(--bg);border-radius:10px;padding:10px 12px}
+.metric .l{font-size:12px;color:var(--ink2)}
+.metric .v{font-size:22px;font-weight:600;line-height:1.3}
+.metric .s{font-size:12px;color:var(--ink2)}
+.scroll{overflow-x:auto}
+table.tbl{width:100%;border-collapse:collapse;font-size:14px;min-width:620px}
+.tbl th{text-align:left;font-weight:500;color:var(--ink2);font-size:12px;padding:4px 6px}
+.tbl td{padding:4px 4px}
+input,select,textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%}
+input[type=number]{width:84px}
+textarea{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;min-height:160px;resize:vertical}
+.btn{font:inherit;font-size:14px;padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;width:auto}
+.btn:hover{border-color:var(--ink2)}
+.btn.main{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn.sm{padding:3px 9px;font-size:13px}
+.idea{display:grid;grid-template-columns:2fr 1.2fr 1.6fr 90px 90px auto;gap:8px;align-items:end;padding:10px 0;border-top:1px solid var(--line)}
+.idea label{display:block;font-size:12px;color:var(--ink2)}
+@media (max-width:760px){.idea{grid-template-columns:1fr 1fr}}
+.legend{display:flex;flex-wrap:wrap;gap:18px;font-size:13px;color:var(--ink2);margin:10px 0 6px 6px}
+.sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.row{display:grid;grid-template-columns:minmax(120px,190px) 1fr 70px;gap:12px;align-items:center;width:100%;padding:7px 10px;border:1px solid transparent;border-radius:8px;background:none;color:inherit;font:inherit;font-size:14px;text-align:left}
+.row.pick{cursor:pointer}
+.row.pick:hover{border-color:var(--line);background:var(--bg)}
+.row.hit{border-color:var(--good);background:var(--good-bg)}
+.row.miss{border-color:var(--signal);background:var(--signal-bg)}
+.bar{display:flex;height:18px;border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%}
+.hrs{text-align:right;color:var(--ink2);font-variant-numeric:tabular-nums}
+.msg{min-height:26px;margin:12px 2px 0;font-size:15px}
+.deck{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-align:left;color:inherit;font:inherit;font-size:14px;line-height:1.45;cursor:pointer}
+.card:hover{border-color:var(--ink2)}
+.card.on{border:2px solid var(--accent);padding:11px 13px}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:6px;background:var(--accent-bg);color:var(--accent);margin-bottom:6px}
+.result{background:var(--bg);border-radius:10px;padding:16px 18px;margin-top:16px}
+.result table{width:100%;border-collapse:collapse;font-size:14px}
+.result td{padding:6px 0;border-top:1px solid var(--line)}
+.result td:last-child{text-align:right;white-space:nowrap}
+.up{color:var(--good)}.down{color:var(--signal)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+</style>
+</head>
+<body>
+<main>
+  <h1>VSM builder and game</h1>
+  <p class="lede">Record your own process, add improvement ideas, then play to find the bottleneck and test which ideas raise flow efficiency the most.</p>
+
+  <section>
+    <h2>How it works</h2>
+    <ol class="how">
+      <li>Enter your current-state steps below: owner, hands-on process time, wait time before the step, and %C&amp;A.</li>
+      <li>Add improvement ideas. Each idea sets a new process time and wait time for one step.</li>
+      <li>Press Start game. Pick the step you think is the biggest bottleneck, then choose which ideas to apply.</li>
+      <li>Compare your choice with the best possible one, then view the full value stream map for the current or future state.</li>
+      <li>Save your work as a file to reload later.</li>
+    </ol>
+    <div class="bar-actions">
+      <label class="btn" style="margin:0">Load file<input type="file" id="load" accept=".json,application/json" style="display:none"></label>
+      <button class="btn" id="save">Save file</button>
+      <button class="btn" id="sample">Reset to sample</button>
+      <button class="btn" id="blank">Start blank</button>
+    </div>
+    <p class="hint">Your work also autosaves in this browser. Times are hours; a working day is counted as 8 hours.</p>
+  </section>
+
+  <section>
+    <h2>1. Current state</h2>
+    <p class="lede" style="margin-bottom:8px">Wait h is how long work sits in the queue before the step starts. %C&amp;A is how often the output is complete and accurate the first time.</p>
+    <div class="metrics" id="metrics"></div>
+    <div class="scroll"><table class="tbl"><thead><tr><th>Step</th><th>Owner</th><th>Process h</th><th>Wait h</th><th>%C&amp;A</th><th></th></tr></thead><tbody id="steps"></tbody></table></div>
+    <div class="bar-actions"><button class="btn" id="addStep">Add step</button></div>
+  </section>
+
+  <section>
+    <h2>2. Improvement ideas</h2>
+    <p class="lede" style="margin-bottom:4px">Set the new process and wait time you expect for one step. Use 0 and 0 to model removing a step.</p>
+    <div id="ideas"></div>
+    <div class="bar-actions"><button class="btn" id="addIdea">Add idea</button></div>
+  </section>
+
+  <section>
+    <h2>3. Play</h2>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <label for="npicks" style="font-size:14px;color:var(--ink2)">Ideas you can pick</label>
+      <input type="number" id="npicks" min="1" max="15" style="width:70px">
+      <button class="btn main" id="start">Start game</button>
+    </div>
+    <div id="game"></div>
+  </section>
+
+  <section>
+    <h2>4. Value stream map</h2>
+    <p class="lede" style="margin-bottom:8px">Process boxes show process time, %C&amp;A, and owner. Triangles show queues with their wait. The ladder underneath adds up wait (upper line) and process time (lower line). Choose the future state after you have played a round.</p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <select id="vmode" style="width:auto"><option value="cur">Current state</option><option value="fut">Future state (my game picks)</option></select>
+      <button class="btn" id="dlsvg">Download SVG</button>
+      <button class="btn" id="dlpng">Download PNG</button>
+    </div>
+    <div class="scroll" id="vsm" style="border:1px solid var(--line);border-radius:10px"></div>
+  </section>
+
+  <section>
+    <h2>5. Mermaid diagram</h2>
+    <p class="lede" style="margin-bottom:8px">Paste this into any Mermaid viewer (for example mermaid.live) to get a flow diagram.</p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <select id="mmode" style="width:auto"><option value="cur">Current state</option><option value="fut">After my game picks</option></select>
+      <button class="btn" id="copy">Copy code</button>
+    </div>
+    <textarea id="mm" readonly></textarea>
+  </section>
+</main>
+
+<script>
+const KEY='vsm-builder-game-v1';
+const WASTES=['Transport','Inventory','Motion','Waiting','Overproduction','Over-processing','Defects','Skills (non-utilized talent)'];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,8);
+const num=v=>Math.max(0,parseFloat(v)||0);
+const r1=x=>Math.round(x*10)/10;
+
+function sample(){
+  const raw=[['RFQ logged','Sales',1,16,95],['Bid/no-bid','Sales lead',2,24,90],['Clarify needs','Sales',4,32,80],['Technical scoping','Engineering',16,56,75],['Costing and pricing','Tendering',8,24,85],['Legal and risk review','Legal',4,40,90],['Approvals','Management',1,48,95],['Compile tender','Tender team',8,16,70],['Submit','Sales',1,8,98]];
+  const steps=raw.map(r=>({id:uid(),name:r[0],owner:r[1],pt:r[2],wt:r[3],ca:r[4]}));
+  const I=(name,waste,i,pt,wt)=>({id:uid(),name,waste,step:steps[i].id,pt,wt});
+  return{picks:3,steps,ideas:[
+    I('Auto-log RFQs from the shared mailbox','Waiting',0,1,2),
+    I('Bid/no-bid scorecard with a 24-hour decision rule','Over-processing',1,1,8),
+    I('Reserve a weekly engineering capacity slot','Waiting',3,16,20),
+    I('Run legal review in parallel with costing','Waiting',5,4,8),
+    I('Tiered approval limits with delegated sign-off','Waiting',6,1,8),
+    I('Tender template with auto-assembled documents','Defects',7,3,4),
+    I('Add one more engineer to the pool','Skills (non-utilized talent)',3,14,56),
+    I('Add a second management approval gate','Over-processing',6,2,72)]};
+}
+function loadLocal(){try{const d=JSON.parse(localStorage.getItem(KEY));return valid(d)?d:null}catch(e){return null}}
+function valid(d){return d&&Array.isArray(d.steps)&&Array.isArray(d.ideas)}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+let S=loadLocal()||sample();
+let G={guess:null,picks:[],done:false,on:false};
+
+function applied(ids){
+  const s=S.steps.map(x=>({...x}));
+  S.ideas.forEach(d=>{if(ids.includes(d.id)){const t=s.find(x=>x.id===d.step);if(t){t.pt=d.pt;t.wt=d.wt}}});
+  return s;
+}
+function tot(s){
+  const pt=s.reduce((a,x)=>a+x.pt,0),wt=s.reduce((a,x)=>a+x.wt,0),lead=pt+wt;
+  const ca=s.reduce((a,x)=>a*(x.ca/100),1)*100;
+  return{pt,lead,fe:lead?pt/lead*100:0,ca};
+}
+function metricsHTML(s,extra){
+  const t=tot(s),m=(l,v,sub)=>'<div class="metric"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+sub+'</div></div>';
+  return m('Process time',r1(t.pt)+' h','hands-on work')+m('Lead time',r1(t.lead)+' h','about '+r1(t.lead/8)+' working days')+m('Flow efficiency',r1(t.fe)+'%','process ÷ lead time')+m('Rolled %C&A',r1(t.ca)+'%','right first time, end to end')+(extra||'');
+}
+
+function renderSteps(){
+  $('steps').innerHTML=S.steps.map((x,i)=>'<tr data-i="'+i+'"><td><input data-f="name" value="'+esc(x.name)+'" aria-label="Step name"></td><td><input data-f="owner" value="'+esc(x.owner)+'" aria-label="Owner"></td><td><input type="number" min="0" step="0.5" data-f="pt" value="'+x.pt+'" aria-label="Process hours"></td><td><input type="number" min="0" step="0.5" data-f="wt" value="'+x.wt+'" aria-label="Wait hours"></td><td><input type="number" min="0" max="100" data-f="ca" value="'+x.ca+'" aria-label="Percent complete and accurate"></td><td style="white-space:nowrap"><button class="btn sm" data-act="up" aria-label="Move up">↑</button> <button class="btn sm" data-act="down" aria-label="Move down">↓</button> <button class="btn sm" data-act="del" aria-label="Remove step">Remove</button></td></tr>').join('');
+}
+function renderIdeas(){
+  if(!S.ideas.length){$('ideas').innerHTML='<p class="hint">No ideas yet. Add one to start.</p>';return}
+  $('ideas').innerHTML=S.ideas.map((d,i)=>{
+    const st=S.steps.find(x=>x.id===d.step);
+    return '<div class="idea" data-i="'+i+'"><div><label>Idea</label><input data-f="name" value="'+esc(d.name)+'"></div>'+
+    '<div><label>Waste targeted</label><select data-f="waste">'+WASTES.map(w=>'<option'+(w===d.waste?' selected':'')+'>'+w+'</option>').join('')+'</select></div>'+
+    '<div><label>Step affected</label><select data-f="step">'+S.steps.map(x=>'<option value="'+x.id+'"'+(x.id===d.step?' selected':'')+'>'+esc(x.name)+'</option>').join('')+'</select></div>'+
+    '<div><label>New process h</label><input type="number" min="0" step="0.5" data-f="pt" value="'+d.pt+'"></div>'+
+    '<div><label>New wait h</label><input type="number" min="0" step="0.5" data-f="wt" value="'+d.wt+'"></div>'+
+    '<div><button class="btn sm" data-act="delIdea">Remove</button></div>'+
+    '<div style="grid-column:1/-1;font-size:12px;color:var(--ink2)">Now: '+(st?st.pt+' h process, '+st.wt+' h wait':'step missing')+'</div></div>';
+  }).join('');
+}
+function renderTop(){
+  $('metrics').innerHTML=metricsHTML(S.steps);
+  $('npicks').value=Math.min(S.picks,Math.max(1,S.ideas.length));
+}
+function scaleMax(){
+  let m=1;S.steps.forEach(x=>{m=Math.max(m,x.pt+x.wt)});
+  S.ideas.forEach(d=>{m=Math.max(m,d.pt+d.wt)});return m;
+}
+function bnIndexes(){const mx=Math.max(...S.steps.map(x=>x.wt));return S.steps.map((x,i)=>x.wt===mx?i:-1).filter(i=>i>=0)}
+function combos(n,k){const out=[];(function go(s,c){if(c.length===k){out.push(c.slice());return}for(let i=s;i<n;i++){c.push(i);go(i+1,c);c.pop()}})(0,[]);return out}
+
+function renderGame(){
+  const el=$('game');
+  if(!G.on){el.innerHTML='';return}
+  if(S.steps.length<2||S.ideas.length<1){el.innerHTML='<p class="msg">Add at least two steps and one improvement idea to play.</p>';return}
+  const N=Math.min(S.picks,S.ideas.length),s=applied(G.picks),sc=scaleMax(),bn=bnIndexes();
+  let h='<div class="metrics" style="margin-top:14px">'+metricsHTML(s,'<div class="metric"><div class="l">Picks left</div><div class="v">'+(N-G.picks.length)+'</div><div class="s">of '+N+'</div></div>')+'</div>';
+  h+='<div class="legend"><span><i class="sw" style="background:var(--work)"></i>Process time</span><span><i class="sw" style="background:var(--wait)"></i>Wait time</span></div><div>';
+  h+=s.map((x,i)=>{
+    const b=S.steps[i];let cls='row'+(G.guess===null?' pick':'');
+    if(G.guess!==null){if(bn.includes(i))cls+=' hit';else if(i===G.guess)cls+=' miss'}
+    const ch=x.pt!==b.pt||x.wt!==b.wt,tag=G.guess===null?'button':'div';
+    return '<'+tag+' class="'+cls+'" data-g="'+i+'"><span>'+esc(x.name)+'</span><div class="bar"><i style="width:'+(x.pt/sc*100)+'%;background:var(--work)"></i><i style="width:'+(x.wt/sc*100)+'%;background:var(--wait)"></i></div><span class="hrs">'+r1(x.pt+x.wt)+' h'+(ch?' *':'')+'</span></'+tag+'>';
+  }).join('')+'</div><div class="msg" id="gmsg" role="status" aria-live="polite">'+(G.msg||(G.guess===null?'Round 1: select the step with the longest wait.':''))+'</div>';
+  if(G.guess!==null&&!G.done){
+    h+='<p class="hint" style="margin:8px 0">Round 2: choose exactly '+N+' ideas. Select a chosen card again to swap it out.</p><div class="deck">'+
+    S.ideas.map(d=>'<button class="card'+(G.picks.includes(d.id)?' on':'')+'" aria-pressed="'+G.picks.includes(d.id)+'" data-id="'+d.id+'"><span class="tag">'+esc(d.waste)+'</span><br>'+esc(d.name)+'</button>').join('')+
+    '</div><div class="bar-actions"><button class="btn main" id="fin">Finish round</button><button class="btn" id="rst">Reset picks</button></div>';
+  }
+  if(G.done){
+    const b=tot(S.steps),t=tot(s),red=b.lead?Math.round((b.lead-t.lead)/b.lead*100):0;
+    const all=combos(S.ideas.length,N);let best=-1e9,bestSet=[];
+    all.forEach(c=>{const ids=c.map(i=>S.ideas[i].id),l=tot(applied(ids)).lead;if(b.lead-l>best){best=b.lead-l;bestSet=ids}});
+    const got=b.lead-t.lead,ratio=best>0?got/best:0;
+    const rate=ratio>=0.9?'Value stream champion':ratio>=0.6?'Strong improvement':got>0?'Good start':'Back to the whiteboard';
+    const rows=(ids)=>ids.map(id=>{const d=S.ideas.find(x=>x.id===id),dl=b.lead-tot(applied([id])).lead;return '<tr><td>'+esc(d.name)+'</td><td class="'+(dl>0?'up':'down')+'">'+(dl>0?'−':'+')+r1(Math.abs(dl))+' h</td></tr>'}).join('');
+    h+='<div class="result"><h2>'+rate+'</h2><p class="lede" style="margin:0 0 10px">Lead time '+r1(b.lead)+' h → '+r1(t.lead)+' h ('+red+'% faster). Flow efficiency '+r1(b.fe)+'% → '+r1(t.fe)+'%. You captured '+Math.round(ratio*100)+'% of the best possible gain.</p><table>'+rows(G.picks)+'</table>'+
+    (ratio<0.999?'<p class="hint" style="margin-top:12px">Best possible '+N+' picks (−'+r1(best)+' h):</p><table>'+rows(bestSet)+'</table>':'')+
+    '<div class="bar-actions"><button class="btn main" id="again">Play again</button></div></div>';
+  }
+  el.innerHTML=h;
+}
+function renderMM(){
+  const s=$('mmode').value==='fut'?applied(G.picks):S.steps;
+  const q=t=>String(t).replace(/["\[\]{}()<>|#;]/g,' ').trim();
+  let out='flowchart LR\n  classDef step fill:#E1F5EE,stroke:#0F6E56,color:#085041;\n  Start(["Customer RFQ"])\n';
+  s.forEach((x,i)=>{out+='  S'+i+'["'+q(x.name)+'<br/>PT '+r1(x.pt)+'h, C&A '+x.ca+'%<br/>'+q(x.owner)+'"]:::step\n'});
+  s.forEach((x,i)=>{out+='  '+(i?'S'+(i-1):'Start')+' -->|"wait '+r1(x.wt)+'h"| S'+i+'\n'});
+  if(s.length)out+='  S'+(s.length-1)+' --> End(["Tender submitted"])\n';
+  const t=tot(s);out+='  Summary["Lead time '+r1(t.lead)+'h, PT '+r1(t.pt)+'h, flow efficiency '+r1(t.fe)+'%"]\n  End --- Summary\n';
+  $('mm').value=out;
+  renderVSM();
+}
+
+function wrapTxt(t,max){
+  const w=String(t).split(' ');let L=[''];
+  w.forEach(x=>{const l=L[L.length-1],c=(l+' '+x).trim();if(c.length<=max)L[L.length-1]=c;else L.push(x)});
+  if(L.length>2)L=[L[0],L.slice(1).join(' ')];
+  return L.map(x=>x.length>max?x.slice(0,max-1)+'…':x);
+}
+function trunc(t,max){t=String(t);return t.length>max?t.slice(0,max-1)+'…':t}
+function renderVSM(){
+  const host=$('vsm'),fut=$('vmode').value==='fut';
+  if(!S.steps.length){host.innerHTML='<p class="hint" style="padding:12px">Add steps to see the map.</p>';return}
+  const s=fut?applied(G.picks):S.steps,b0=S.steps;
+  const gap=84,bw=136,bh=104,x0=24,top=84,n=s.length;
+  const W=x0+n*(gap+bw)+24,y0=top+bh+66,y1=y0+34,H=y1+86;
+  const mx=Math.max(...s.map(x=>x.wt)),t=tot(s),t0=tot(b0);
+  const T=(x,y,txt,o)=>'<text x="'+x+'" y="'+y+'" '+(o||'')+'>'+esc(txt)+'</text>';
+  let o='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" style="display:block;font-family:system-ui,-apple-system,Segoe UI,sans-serif" role="img" aria-label="Value stream map">';
+  o+='<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--ink2)"/></marker></defs>';
+  o+='<rect width="'+W+'" height="'+H+'" style="fill:var(--panel)"/>';
+  o+=T(x0,24,fut?'Future state':'Current state','style="fill:var(--ink);font-size:15px;font-weight:600"');
+  o+=T(x0,42,'Tender process, '+n+' steps','style="fill:var(--ink2);font-size:12px"');
+  let ladderW='',ladderP='',ladderV='';
+  s.forEach((x,i)=>{
+    const gx=x0+i*(gap+bw),bx=gx+gap,cx=gx+gap/2,b=b0[i]||x;
+    const isBn=x.wt===mx&&mx>0,chg=fut&&(x.pt!==b.pt||x.wt!==b.wt);
+    const ty=top+bh/2-22;
+    // queue triangle
+    o+='<polygon points="'+(cx-16)+','+(ty+28)+' '+(cx+16)+','+(ty+28)+' '+cx+','+ty+'" style="fill:'+(isBn?'var(--signal-bg)':'var(--bg)')+';stroke:'+(isBn?'var(--signal)':'var(--ink2)')+';stroke-width:1.5"/>';
+    o+=T(cx,ty+23,'I','text-anchor="middle" style="fill:var(--ink2);font-size:12px;font-weight:600"');
+    o+=T(cx,ty+46,r1(x.wt)+' h','text-anchor="middle" style="fill:'+(isBn?'var(--signal)':'var(--ink)')+';font-size:12px;font-weight:600"');
+    if(fut&&x.wt!==b.wt)o+=T(cx,ty+60,'was '+r1(b.wt)+' h','text-anchor="middle" style="fill:var(--ink2);font-size:11px"');
+    if(isBn&&!fut)o+=T(cx,ty-8,'Bottleneck','text-anchor="middle" style="fill:var(--signal);font-size:11px;font-weight:600"');
+    // push arrow
+    o+='<line x1="'+(cx+20)+'" y1="'+(top+bh/2)+'" x2="'+(bx-3)+'" y2="'+(top+bh/2)+'" style="stroke:var(--ink2);stroke-width:1.5" marker-end="url(#ah)"/>';
+    // process box
+    o+='<rect x="'+bx+'" y="'+top+'" width="'+bw+'" height="'+bh+'" rx="6" style="fill:var(--bg);stroke:'+(chg?'var(--accent)':'var(--ink2)')+';stroke-width:'+(chg?2.5:1.5)+'"/>';
+    o+='<line x1="'+bx+'" y1="'+(top+42)+'" x2="'+(bx+bw)+'" y2="'+(top+42)+'" style="stroke:var(--line)"/>';
+    wrapTxt(x.name,18).forEach((ln,k)=>{o+=T(bx+bw/2,top+18+k*14,ln,'text-anchor="middle" style="fill:var(--ink);font-size:12px;font-weight:600"')});
+    o+=T(bx+8,top+60,'PT '+r1(x.pt)+' h'+(fut&&x.pt!==b.pt?' (was '+r1(b.pt)+')':''),'style="fill:var(--ink);font-size:12px"');
+    o+=T(bx+8,top+77,'C&A '+x.ca+'%','style="fill:var(--ink);font-size:12px"');
+    o+=T(bx+8,top+94,trunc(x.owner||'No owner',20),'style="fill:var(--ink2);font-size:11px"');
+    // kaizen bursts for chosen ideas
+    if(fut){S.ideas.filter(d=>G.picks.includes(d.id)&&d.step===x.id).forEach((d,k)=>{
+      const yy=top-16-k*17;
+      o+='<polygon transform="translate('+(bx+8)+','+yy+')" points="0,-8 2.4,-2.6 8,-2.6 3.4,1 5.2,7 0,3.4 -5.2,7 -3.4,1 -8,-2.6 -2.4,-2.6" style="fill:var(--accent-bg);stroke:var(--accent);stroke-width:1.2"/>';
+      o+='<text x="'+(bx+22)+'" y="'+(yy+4)+'" style="fill:var(--accent);font-size:11px"><title>'+esc(d.name)+'</title>'+esc(trunc(d.name,22))+'</text>';
+    })}
+    // ladder
+    ladderW+='<line x1="'+gx+'" y1="'+y0+'" x2="'+bx+'" y2="'+y0+'" style="stroke:var(--wait);stroke-width:5"/>';
+    ladderP+='<line x1="'+bx+'" y1="'+y1+'" x2="'+(bx+bw)+'" y2="'+y1+'" style="stroke:var(--work);stroke-width:5"/>';
+    ladderV+='<line x1="'+bx+'" y1="'+y0+'" x2="'+bx+'" y2="'+y1+'" style="stroke:var(--ink2)"/><line x1="'+(bx+bw)+'" y1="'+y1+'" x2="'+(bx+bw)+'" y2="'+y0+'" style="stroke:var(--ink2)"/>';
+    ladderV+=T(cx,y0-9,r1(x.wt)+' h','text-anchor="middle" style="fill:'+(isBn?'var(--signal)':'var(--ink2)')+';font-size:11px"');
+    ladderV+=T(bx+bw/2,y1+19,r1(x.pt)+' h','text-anchor="middle" style="fill:var(--work);font-size:11px;font-weight:600"');
+  });
+  o+=ladderW+ladderP+ladderV;
+  o+=T(x0,y1+40,'Upper line: wait time. Lower line: process time.','style="fill:var(--ink2);font-size:11px"');
+  const dd=fut?'  (was '+r1(t0.lead)+' h, '+r1(t0.fe)+'%)':'';
+  o+=T(x0,H-28,'Lead time '+r1(t.lead)+' h (about '+r1(t.lead/8)+' working days)   |   Process time '+r1(t.pt)+' h   |   Flow efficiency '+r1(t.fe)+'%'+dd+'   |   Rolled %C&A '+r1(t.ca)+'%','style="fill:var(--ink);font-size:13px;font-weight:600"');
+  if(fut&&!G.picks.length)o+=T(x0,H-10,'No game picks yet. Play a round and finish it to fill in the future state.','style="fill:var(--signal);font-size:11px"');
+  o+='</svg>';
+  host.innerHTML=o;
+}
+function svgExport(){
+  const svg=$('vsm').querySelector('svg');if(!svg)return null;
+  const cs=getComputedStyle(document.documentElement);
+  return svg.outerHTML.replace(/var\(--([a-z0-9]+)\)/g,(m,k)=>cs.getPropertyValue('--'+k).trim()||'#000');
+}
+function dl(url,name){const a=document.createElement('a');a.href=url;a.download=name;a.click()}
+function refresh(full){persist();renderTop();if(full){renderSteps();renderIdeas()}renderMM()}
+function resetGame(){G={guess:null,picks:[],done:false,on:false};renderGame()}
+
+document.addEventListener('input',e=>{
+  const t=e.target,f=t.dataset.f;
+  if(t.id==='npicks'){S.picks=Math.max(1,Math.min(15,parseInt(t.value)||1));persist();return}
+  if(!f)return;
+  const tr=t.closest('[data-i]');if(!tr)return;
+  const i=+tr.dataset.i,isStep=!!t.closest('#steps');
+  const obj=isStep?S.steps[i]:S.ideas[i];
+  if(f==='name'||f==='owner'||f==='waste'||f==='step')obj[f]=t.value;
+  else obj[f]=f==='ca'?Math.min(100,num(t.value)):num(t.value);
+  if(G.on)resetGame();
+  persist();renderTop();renderMM();
+});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.id==='mmode'||t.id==='vmode'){renderMM();return}
+  if(t.dataset.f==='step'||(t.dataset.f==='name'&&t.closest('#steps')))renderIdeas();
+});
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  const act=b.dataset.act,tr=b.closest('[data-i]'),i=tr?+tr.dataset.i:-1;
+  if(act==='up'&&i>0){[S.steps[i-1],S.steps[i]]=[S.steps[i],S.steps[i-1]];resetGame();refresh(true)}
+  else if(act==='down'&&i<S.steps.length-1){[S.steps[i+1],S.steps[i]]=[S.steps[i],S.steps[i+1]];resetGame();refresh(true)}
+  else if(act==='del'){const id=S.steps[i].id;S.steps.splice(i,1);S.ideas=S.ideas.filter(d=>d.id&&d.step!==id);resetGame();refresh(true)}
+  else if(act==='delIdea'){S.ideas.splice(i,1);resetGame();refresh(true)}
+  else if(b.id==='addStep'){S.steps.push({id:uid(),name:'New step',owner:'',pt:1,wt:0,ca:100});resetGame();refresh(true)}
+  else if(b.id==='addIdea'){if(!S.steps.length){alert('Add a step first.');return}if(S.ideas.length>=15){alert('Up to 15 ideas are supported.');return}S.ideas.push({id:uid(),name:'New idea',waste:'Waiting',step:S.steps[0].id,pt:S.steps[0].pt,wt:S.steps[0].wt});resetGame();refresh(true)}
+  else if(b.id==='sample'){if(confirm('Replace your data with the sample process?')){S=sample();resetGame();refresh(true)}}
+  else if(b.id==='blank'){if(confirm('Clear everything and start blank?')){S={picks:3,steps:[],ideas:[]};resetGame();refresh(true)}}
+  else if(b.id==='save'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));a.download='vsm-process.json';a.click();URL.revokeObjectURL(a.href)}
+  else if(b.id==='start'){G={guess:null,picks:[],done:false,on:true};renderGame()}
+  else if(b.id==='copy'){const m=$('mm');m.select();(navigator.clipboard?navigator.clipboard.writeText(m.value):Promise.reject()).catch(()=>document.execCommand('copy'));b.textContent='Copied';setTimeout(()=>b.textContent='Copy code',1500)}
+  else if(b.id==='dlsvg'){const x=svgExport();if(x)dl(URL.createObjectURL(new Blob([x],{type:'image/svg+xml'})),'value-stream-map.svg')}
+  else if(b.id==='dlpng'){const x=svgExport();if(!x)return;const sv=$('vsm').querySelector('svg'),w=sv.viewBox.baseVal.width,hh=sv.viewBox.baseVal.height,im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=w*2;c.height=hh*2;const g=c.getContext('2d');g.scale(2,2);g.drawImage(im,0,0,w,hh);c.toBlob(bl=>dl(URL.createObjectURL(bl),'value-stream-map.png'))};im.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(x)}
+  else if(b.dataset.g!==undefined&&G.guess===null){
+    G.guess=+b.dataset.g;const bn=bnIndexes();
+    G.msg=bn.includes(G.guess)?'Nailed it. '+esc(S.steps[G.guess].name)+' has the longest wait ('+r1(S.steps[G.guess].wt)+' h).':'Close. The longest wait is at '+bn.map(k=>esc(S.steps[k].name)).join(' and ')+' ('+r1(S.steps[bn[0]].wt)+' h). All bars share one scale, so compare the gray segments.';
+    renderGame()}
+  else if(b.classList.contains('card')){
+    const N=Math.min(S.picks,S.ideas.length),id=b.dataset.id;
+    if(G.picks.includes(id))G.picks=G.picks.filter(x=>x!==id);
+    else if(G.picks.length<N)G.picks.push(id);
+    else{G.msg='You already have '+N+' picks. Select a chosen card to swap it out.';renderGame();return}
+    G.msg='';renderGame();renderMM()}
+  else if(b.id==='fin'){const N=Math.min(S.picks,S.ideas.length);if(G.picks.length<N){G.msg='Choose '+N+' ideas before finishing.';renderGame();return}G.done=true;G.msg='';renderGame();renderMM()}
+  else if(b.id==='rst'){G.picks=[];G.msg='';renderGame();renderMM()}
+  else if(b.id==='again'){G={guess:null,picks:[],done:false,on:true};renderGame();renderMM()}
+});
+$('load').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!valid(d))throw 0;d.steps.forEach(x=>{x.id=x.id||uid();x.ca=x.ca==null?100:x.ca});d.ideas.forEach(x=>{x.id=x.id||uid()});d.picks=d.picks||3;S=d;resetGame();refresh(true)}catch(err){alert('That file could not be read. Load a file saved from this tool.')}};
+  rd.readAsText(f);e.target.value='';
+});
+renderTop();renderSteps();renderIdeas();renderMM();
+</script>
+</body>
+</html>
