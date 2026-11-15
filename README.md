@@ -1,0 +1,2 @@
+# vsm-game
+Building VSM
